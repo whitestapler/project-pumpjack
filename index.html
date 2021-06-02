@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" type= "text/css" href="main.css">
+    
+    <title>Document</title>
+</head>
+<body>
+    <script type="module" src="/js/client.js"></script>
+    <script type="text/javascript" src="/js/animation.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.6.0/gsap.min.js"></script>
+
+    <div class="container">
+        <div class="overlay">
+            <div class="fp-elements">
+                <div class="title-wrapper">            
+                    <h class="main-title">
+                        There's a suspicious correlation between urban Oil Drilling and Redlining in LA
+                    </h>
+                </div>
+                <div class="explainer-wrapper">
+                    <div class="text">        
+                            <p class="desc1">
+                                This site is a data visualization of 
+                                <a href="https://gis.conservation.ca.gov/portal/home/item.html?id=335e036c6a4f4cc39148ca2a9e0389c7" target="_blank">
+                                    urban crude oil pumpjacks in southwest Los Angeles
+                                </a> 
+                                and their correlation to a 
+                                <a href="https://dsl.richmond.edu/panorama/redlining/#loc=12/33.798/-118.326&city=los-angeles-ca" target="_blank">
+                                    Los Angeles redlining map from 1939
+                                </a>
+                            </p>
+<!--                           <div class="images-row">
+                                <div class="column">
+                                    <img src="/content/green cube.svg" alt="">
+                                </div>
+                            </div>
+                            <p class="desc2">
+                                Click on the floating green cubes or navigate the legend menu to learn more about the map
+                            </p>
+--> 
+                    </div>               
+                        <div class="explore-button">
+                        <startbutton class="enter_button" onclick="fadeOut()">
+                            EXPLORE
+                        </button>
+                        </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+    <div class="legend">
+        <div class="content-wrapper">
+            <div class="title_legend">
+                <p>Legend</p>
+            </div>
+            <div class="pumpjack_colors">
+                <div class="legend-title">
+                    <p>Pumpjacks</p>
+                </div>
+                <div class="pump_id">
+                    <div class="text">
+                        <p>Currently Active</p>
+                    </div>
+                    <div class="box1"></div>
+                </div>
+                <div class="pump_id">
+                    <div class="text">
+                        <p>Newly Built 2019-</p>
+                    </div>
+                    <div class="box2"></div>
+                </div>
+                <div class="pump_id">
+                    <div class="text">
+                        <p>Idle</p>
+                    </div>
+                    <div class="box3"></div>
+                </div>
+                <div class="pump_id">
+                    <div class="text">
+                        <p>Plugged/Removed</p>
+                    </div>
+                    <div class="box4"></div>
+                </div>
+            </div>
+
+            <div class="income_legend">
+                <div class="legend-title">
+                    <p>Income Distribution</p>
+                </div>
+                <div class="pump_id">
+                    <div class="text">
+                        <p>High</p>
+                    </div>
+                    <div class="box1"></div>
+                </div>
+                <div class="pump_id">
+                    <div class="text">
+                        <p>Middle-upper</p>
+                    </div>
+                    <div class="box2"></div>
+                </div>
+                <div class="pump_id">
+                    <div class="text">
+                        <p>Medium</p>
+                    </div>
+                    <div class="box3"></div>
+                </div>
+                <div class="pump_id">
+                    <div class="text">
+                        <p>Low</p>
+                    </div>
+                    <div class="box4"></div>
+                </div>
+            </div>
+
+            <div class="map">
+                <div class="title_legend">
+                    <p>Map</p>
+                </div>
+                <div class="map-links">
+                    <button class="exp_btn" onclick = exp_redlining()>
+                        About Redlining
+                    </button>
+                    <button class="exp_btn" onclick = exp_map()>
+                        About this Visualization
+                    </button>
+                    <button class="exp_btn" id="hideShow">
+                        Show/hide 2019 income distribution map
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="exp_map">
+        <div class="exp_text">
+            <h1>About this Visualization</h1>
+            <p>
+                This visualization was created using the
+                <a href="https://gis.conservation.ca.gov/portal/home/item.html?id=335e036c6a4f4cc39148ca2a9e0389c7" target="_blank">Oil and Gas Wells GIS California</a>
+                public dataset updated, May 18th 2021 and a Redlining map from
+                <a href="https://dsl.richmond.edu/panorama/redlining/#loc=11/34.005/-118.407&city=los-angeles-ca&text=downloads" target="_blank">Mapping Inequality</a>
+                under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+                The 2019 income distribution map of this area is from the
+                <a href="http://maps.latimes.com/neighborhoods/income/median/neighborhood/list/" target="_blank">Los Angeles Times</a>
+                under the
+                <a href="https://creativecommons.org/licenses/by-sa/2.0/" target="_blank">CC BY-SA 2.0</a>
+                license.
+            </p>
+            <h1>Why 3D?</h1>
+            <p>There are many 2D oil well maps that contain more precise and complete information about each individual oil well such as
+            <a href="https://keck.maps.arcgis.com/apps/MapJournal/index.html?appid=db1d15e66808421c978a4c54d7414765" target="_blank">this one by University of Southern California</a>
+            and 
+            <a href="https://www.latimes.com/projects/california-oil-well-drilling-idle-cleanup/" target="_blank">this one by the LA times</a>
+            Some are also updated very frequently and provide in depth information about each individual well such as 
+            <a href="https://newsomwellwatch.com/" target="_blank">this one</a>
+            tracking the new oil permits being approved for drilling this year (2021).
+            With that said, it is difficult to visualize how many wells there are when they are represented as dots. There are more than 9800 oil wells represented here in this section of LA and having them shown as individual pumpjacks makes it easier to visualize just how many there are.
+            </p>
+            <h1>Things to Consider</h1>
+            <p>
+                There are some things that you should consider about this visualization before you come to any concrete conclusions
+            </p>
+            <h2>Size</h2>
+            <p>
+                The sizing of these 3D pumpjack models are not to scale and are much biggers than the real ones on site and of course, they all don't face the same direction like the ones shown here
+            </p>
+            <h2>Time</h2>
+            <p>
+                Since there is no scale for time on this map (yet) it is easy to come to false conclusions about when events occured in different areas. Many of these oil wells were built before this redlining map was made and newer pumpjacks were built ontop of them as the years went by. This map is not to show the choices of specific companies or communities, but to display an overall trend that looks rather interesting.
+            </p>
+
+        </div>
+        <button class="exit_panel" onclick = oexp_map()>X</button>
+    </div>
+
+    <div class="exp_redlining">
+        <div class="exp_text">
+            <h1>Redlining</h1>
+            <p1>
+            This map was used by lenders and government agencies as a 
+            <a href="https://clkrep.lacity.org/onlinedocs/2019/19-0600_misc_5-6-19.pdf" target="_blank" rel="noopener">reference</a>
+            for how worthy someone was of a loan, based on where they were from.
+
+                First grade areas, marked in green, are predominantly white and affluent neighborhoods. These areas are often far from industrial zones and were deemed "most desirable". In suit, second grade areas are marked in blue and third grade areas are marked in yellow. Fourth grade areas or red areas were neighborhoods with a greater share of people who were deemed more likely to default on mortgage. If you lived in a red area, it was extremely difficult to get approved for a loan to buy a house or renovate your home, making social mobility next to impossible. These red areas were predominantly black and hispanic low-income neighborhoods in industrial areas. Redlining has been known to be an 
+                <a href="https://ncrc.org/wp-content/uploads/dlm_uploads/2018/02/NCRC-Research-HOLC-10.pdf" target="_blank">outdated and racist practice</a>
+                that has extended its impact into modern day american cities. This practice kept                  
+                <a href="https://cpb-us-e1.wpmucdn.com/sites.suffolk.edu/dist/3/1172/files/2014/01/Rice-Swesnik_Lead.pdf" target="_blank">people of similar racial and socioeconomic backgrounds together,</a>
+                 encouraged advantaged groups to do business amongst themselves and discouraged disadvantaged groups from being able to move up the social ladder.
+            </p1>
+        
+
+            <h2>What does this have to do with oil?</h2>
+            <p1>
+                Los Angeles sits on many 
+                <a href="http://www.laalmanac.com/energy/en14.php" target="_blank">large oil basins</a>
+                that are of great interest to oil companies. As a result, much of the city’s history has been closely intertwined with the oil industry. Before redlining, poor people and people of color were consigned to these industrial oil fields of the city because they couldn't afford to live in more expensive areas. Redlining then entrenched these minorities into these areas as a matter of government policy, which limited their social mobility and kept them near these drill sites. Now, these wells no longer produce as much as they did before and many remain idle and unplugged, releasing
+                <a href="https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0170423" target="_blank">toxic chemicals harmful to human health. </a>
+                In the past century since this map was made, some of these industrial neighborhoods became wealthier and were able to get their local government to remove their wells when oil production began to drop off, such as the case with 
+                <a href="https://academic.oup.com/jah/article/99/1/82/854939" target="_blank">Venice Beach.</a>
+                However, there are still some neighborhoods where it is very difficult due to the abundance of oil and overwhelming 
+                <a href="https://www.cityofsignalhill.org/422/The-Oil-Field">presence of local oil companies in the local government. </a>
+                This map shows that there is a history of exploiting resources where people are the most disadvantaged.
+            </p1>
+                <div> 
+
+                </div>
+            <button class="exit_panel" onclick = oexp_redlining()>X</button>
+        </div>
+    
+    </div>
+</body>
+</html>
