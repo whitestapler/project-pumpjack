@@ -8,47 +8,131 @@ const PUMPJACK_PATHNAME = 'content/pumpjack2.glb'
 const ACTIVE_LOCATIONS = 'content/positions_normalized_wellstatus.csv'
 
 
-function vertexShader() {
-    return `
-    precision highp float;
+// function vertexShader() {
+//     return `
+//     precision highp float;
 
-    uniform mat4 projectionMatrix;
-    uniform mat4 modelViewMatrix;
+//     uniform mat4 projectionMatrix;
+//     uniform mat4 modelViewMatrix;
 
-    attribute vec3 position;
-    attribute vec3 offset;
-    attribute vec4 color;
+//     attribute vec3 position;
+//     attribute vec3 offset;
+//     attribute vec4 color;
 
-    varying vec3 vPosition;
-    varying vec4 vColor;
+//     varying vec3 vPosition;
+//     varying vec4 vColor;
 
-    void main(){
-        vPosition = offset * max(abs( 0.2 ), 1.0) + position;
+//     void main(){
+//         vPosition = offset * max(abs( 0.2 ), 1.0) + position;
         
-        vColor = color;
+//         vColor = color;
 
-        gl_Position = projectionMatrix * modelViewMatrix * vec4( vPosition, 1.0 );
+//         gl_Position = projectionMatrix * modelViewMatrix * vec4( vPosition, 1.0 );
 
-    }    
-    `
+//     }    
+//     `
+// }
+
+// function fragmentShader() {
+//     return `
+//     precision highp float;
+
+
+//     varying vec3 vPosition;
+//     varying vec4 vColor;
+
+//     void main() {
+
+//         vec4 color = vec4( vColor );
+
+//         gl_FragColor = color;
+
+//     }
+//     `
+// }
+
+function instanceStandardMaterial() {
+    const instanceMaterial = new THREE.MeshStandardMaterial({color:0xffffff});
+    instanceMaterial.onBeforeCompile = function ( shader ) {
+        shader.vertexShader = `  
+            attribute vec3 instanceOffset;
+            attribute float instanceOpacity;
+            varying float vInstanceOpacity;
+        ` + shader.vertexShader;
+
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <begin_vertex>',
+            [
+                'vec3 transformed = vec3( position + instanceOffset );',
+                'vInstanceOpacity = instanceOpacity;',
+
+            ].join( '\n' )
+        );
+
+        // shader.fragmentShader = `
+        //     varying float vInstanceOpacity;
+        // ` + shader.fragmentShader;
+
+        // shader.fragmentShader = shader.fragmentShader.replace(
+        //     '#include <color_fragment>',
+        //     [
+        //         '#include <color_fragment>',
+        //         'diffuseColor.a = vInstanceOpacity;',
+        //     ].join( '\n' )
+        //   );
+
+      };
+    return instanceMaterial;
 }
 
-function fragmentShader() {
-    return `
-    precision highp float;
+function instanceCustomDistanceMaterial() {
+    var myCustomDistanceMaterial = new THREE.MeshDistanceMaterial({
+        depthPacking: THREE.RGBADepthPacking,
+        alphaTest: 0.5
+      });
 
+    // app specific instancing shader code (only on vertex shader)
+    myCustomDistanceMaterial.onBeforeCompile = shader => {
+        // add instanced attribute to beginning
+        shader.vertexShader = `  
+            attribute vec3 instanceOffset;
+        ` + shader.vertexShader;
+        // modify 'transformed' variable with attribute
+        shader.vertexShader = shader.vertexShader.replace(
+          "#include <project_vertex>",
+          `
+          transformed = instanceOffset + transformed;
+          #include <project_vertex>
+          `
+        );
+      };
 
-    varying vec3 vPosition;
-    varying vec4 vColor;
+    return myCustomDistanceMaterial;
+}
 
-    void main() {
+function instanceCustomDepthMaterial() {
+    var myCustomDepthMaterial = new THREE.MeshDepthMaterial({
+        depthPacking: THREE.RGBADepthPacking,
+        alphaTest: 0.5
+      });
 
-        vec4 color = vec4( vColor );
+    // app specific instancing shader code (only on vertex shader)
+    myCustomDepthMaterial.onBeforeCompile = shader => {
+        // add instanced attribute to beginning
+        shader.vertexShader = `  
+            attribute vec3 instanceOffset;
+        ` + shader.vertexShader;
+        // modify 'transformed' variable with attribute
+        shader.vertexShader = shader.vertexShader.replace(
+          "#include <project_vertex>",
+          `
+          transformed = instanceOffset + transformed;
+          #include <project_vertex>
+          `
+        );
+      };
 
-        gl_FragColor = color;
-
-    }
-    `
+    return myCustomDepthMaterial;
 }
 
 let camera, scene, renderer, controls;
@@ -61,11 +145,6 @@ init().catch( function ( err ) {
 } );
 
 async function init() {
-/// Renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
 /// Scene and Camera
     scene = new THREE.Scene();
     scene.background = new THREE.Color( 0xcccccc );
@@ -80,6 +159,20 @@ async function init() {
     const start_cam_point = new THREE.Vector3(0, 0, 0);
     camera.lookAt(start_cam_point);
     //camera.rotation.y = 90 * Math.PI / 180;
+
+/// Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
+    renderer.shadowCameraNear = 0.1;
+    renderer.shadowCameraFar = camera.far;
+    renderer.shadowCameraFov = 50;
+    renderer.shadowMapBias = 0.0039;
+    renderer.shadowMapDarkness = 0.5;
+    renderer.shadowMapWidth = 2048;
+    renderer.shadowMapHeight = 2048;
+    document.body.appendChild(renderer.domElement);
 
 /// Controls
     controls = new OrbitControls( camera, renderer.domElement );
@@ -96,38 +189,79 @@ async function init() {
     controls.maxPolarAngle = Math.PI / 2;
 
 /// Lights
-    const dirLight1 = new THREE.DirectionalLight( 0xffffff );
-    dirLight1.position.set( 1, 1, 1 );
+
+    const dirLightFrustumSize = 1500;
+    const west_target = new THREE.Object3D();
+    west_target.position.set(0,0,500);
+    scene.add(west_target);
+    const east_target = new THREE.Object3D();
+    east_target.position.set(0,0,100);
+    scene.add(east_target);
+
+    const dirLight1 = new THREE.DirectionalLight( 0xffffff, 0.8 );
+    dirLight1.position.set( 0, 500, 0 );
+    dirLight1.target = west_target;
+    // dirLight1.target.position.set(0,0,100);
+    dirLight1.castShadow = true;
+    dirLight1.shadow.camera.far = 1000;
+    dirLight1.shadow.camera.left = -dirLightFrustumSize; // or whatever value works for the scale of your scene
+    dirLight1.shadow.camera.right = dirLightFrustumSize;
+    dirLight1.shadow.camera.top = dirLightFrustumSize;
+    dirLight1.shadow.camera.bottom = -dirLightFrustumSize;
+    dirLight1.shadow.mapSize.x = 16384;
+    dirLight1.shadow.mapSize.y = 16384;
     scene.add( dirLight1 );
 
-    const dirLight2 = new THREE.DirectionalLight( 0x002288 );
-    dirLight2.position.set( - 1, - 1, - 1 );
+    const dirLight2 = new THREE.DirectionalLight( 0xb8c9ff, .1 );
+    dirLight2.position.set( 0, 500, 0 );
+    dirLight2.target = east_target;
+    //dirLight2.castShadow = true;
+    // dirLight2.shadow.camera.far = 1000;
+    // dirLight2.shadow.camera.left = -dirLightFrustumSize; // or whatever value works for the scale of your scene
+    // dirLight2.shadow.camera.right = dirLightFrustumSize;
+    // dirLight2.shadow.camera.top = dirLightFrustumSize;
+    // dirLight2.shadow.camera.bottom = -dirLightFrustumSize;
+    // dirLight2.shadow.mapSize.x = 8192;
+    // dirLight2.shadow.mapSize.y = 8192;
     scene.add( dirLight2 );
 
-    const ambientLight = new THREE.AmbientLight( 0x222222 );
+
+    const plight = new THREE.PointLight( 0xffffff , 10, 100 );
+    plight.position.set( 0, 1, 0 );
+    plight.castShadow = true;
+    //scene.add(plight);
+
+    const ambientLight = new THREE.AmbientLight( 0xb8c9ff , 0.2);
     scene.add( ambientLight );
 
 /// Geometry and Materials
     // ground
+    const planeGeometry = new THREE.PlaneGeometry(1400,1400);
     const texture_floor = new THREE.TextureLoader().load('/content/southmap.png');
-    const mesh_floor = new THREE.Mesh( new THREE.PlaneGeometry(1400,1400), new THREE.MeshBasicMaterial({map:texture_floor}) );
-    //console.log(mesh_floor);
-    mesh_floor.rotation.x = - Math.PI / 2;
-    mesh_floor.rotation.z = - Math.PI / 2
+    const mesh_floor = new THREE.Mesh( planeGeometry, new THREE.MeshBasicMaterial({map:texture_floor}) );
+    const mesh_shadowcatcher = new THREE.Mesh( planeGeometry, new THREE.ShadowMaterial({opacity: 0.5}) );
+
+    mesh_floor.rotation.set(- Math.PI / 2, 0, - Math.PI / 2);
+    mesh_floor.position.y = -0.03;
 
     const texture_modern_income = new THREE.TextureLoader().load('/content/modern_income.png');
-    const mesh_modern_income = new THREE.Mesh( new THREE.PlaneGeometry(1400, 1400), new THREE.MeshBasicMaterial({map:texture_modern_income}));
+    const mesh_modern_income = new THREE.Mesh( planeGeometry, new THREE.MeshBasicMaterial({map:texture_modern_income}));
 
-    mesh_modern_income.rotation.x = - Math.PI / 2;
-    mesh_modern_income.rotation.z = - Math.PI / 2
-    mesh_modern_income.position.y = -0.01;
+    mesh_modern_income.rotation.set(- Math.PI / 2, 0, - Math.PI / 2);
+    mesh_modern_income.position.y = -0.04;
     var objHidden = true;
     mesh_modern_income.visible = false;
     mesh_floor.visible = true;
     mesh_modern_income.frustumCulled = false;
 
-    scene.add(mesh_modern_income);
+    mesh_shadowcatcher.rotation.set(- Math.PI / 2, 0, - Math.PI / 2);
+    mesh_shadowcatcher.position.y = mesh_floor.position.y;
+    mesh_shadowcatcher.receiveShadow = true;
+    mesh_shadowcatcher.frustumCulled = false;
+
+    //scene.add(mesh_modern_income);
     scene.add( mesh_floor );
+    scene.add(mesh_shadowcatcher);
 
     document.getElementById("hideShow").addEventListener("click", function(){
         if(objHidden) {
@@ -225,10 +359,16 @@ async function init() {
 
         // attributes
         const vector = new THREE.Vector4();
-        const instances = pumpjack_data.length;
+        const instancesTotal = pumpjack_data.length;
+        var instances = instancesTotal;
+        var instancesOpaque = 0;
+        var instancesTransparent = 0;
         const positions = [];
         const offsets = [];
         const colors = [];
+        const offsetsTransparent = [];
+        const colorsTransparent = [];
+        const opacities = [];
         positions.push( 0, 5, 0 );
         positions.push( 1, 0, 0 );
 
@@ -237,23 +377,58 @@ async function init() {
             // offsets
             const spreadx = 915;
             const spreadz = 1940;
-            offsets.push( spreadx*(pumpjack_data[i].latitude - 0.592), 0, spreadz*(pumpjack_data[i].longitude - 0.356) );
-            var wellstatus = pumpjack_data[i].wellstatus
+            var offset = [ spreadx*(pumpjack_data[i].latitude - 0.592), 0, spreadz*(pumpjack_data[i].longitude - 0.356) ];
+
+            var wellstatus = pumpjack_data[i].wellstatus;
+            
+            var color = (0.0,0.0,0.0);
+            var opacity = 0.0;
 
             switch(wellstatus){
-                case "Idle": colors.push(0.6,0.4,0.2,1);
+                case "Plugged": 
+                    color = [0.0,0.0,0.0];
+                    offset.y -= -0.005;
+                    opacity = 0.06;
                     break;
-                case "Active": colors.push(0.0,0.0,0.0,1.0);
+                case "Canceled":
+                    color = [0.0,0.0,0.0];
+                    offset.y -= -0.005;
                     break;
-                case "Plugged": colors.push(0.0,0.0,0.0,0.06);
+                case "Idle": 
+                    color = [0.6,0.4,0.2];
+                    opacity = 1.0;
                     break;
-                case "New": colors.push(1.0, 0.0, 0.0, 1.0);
+                case "Active": 
+                    color = [0.1,0.1,0.1];
+                    offset.y -= -0.0025;
+                    opacity = 1.0;
                     break;
-                case "Canceled": colors.push(0.0, 0.0, 0.0, 0.0);
+                case "New": 
+                    color = [1.0, 0.0, 0.0];
+                    opacity = 1.0;
                     break;
-                case "Unknown": colors.push(1.0, 1.0, 0.0, 1.0);
+                case "Unknown": 
+                    color = [1.0, 1.0, 0.0];
+                    offset.y -= -0.005;
+                    opacity = 1.0;
                     break;
-                default: colors.push( 0.0, 0.0, 1, 1.0);
+                default: 
+                    color = [ 0.0, 0.0, 1.0];
+                    offset.y -= -0.0075;
+                    opacity = 1.0;
+                    break;
+            }
+
+            if (opacity >= 1.0) {
+                offsets.push(...offset);
+                colors.push(...color);
+                instancesOpaque++;
+            }
+            else if (opacity > 0.0) {
+                offsetsTransparent.push(...offset);
+                colorsTransparent.push(...color);
+                opacities.push(opacity);
+                instancesTransparent++;
             }
 
         }
@@ -261,33 +436,65 @@ async function init() {
         const scaleFactor = 1000; 
         gltf.scene.scale.multiplyScalar(scaleFactor);
         const gltfMesh = gltf.scene.children[0];
-        const gltfBufferGeometry = gltfMesh.geometry;
+        const gltfMeshTransparent = gltfMesh.clone();
 
+        const gltfBufferGeometry = gltfMesh.geometry;
+        const gltfBufferGeometryTransparent = gltfMeshTransparent.geometry;
+        
         const instancedBufferGeometry = new THREE.InstancedBufferGeometry();
         instancedBufferGeometry.index = gltfBufferGeometry.index;
-        instancedBufferGeometry.instanceCount = instances;
+        instancedBufferGeometry.instanceCount = instancesOpaque;
+        instancedBufferGeometry.maxInstancedCount = instancesOpaque;
         instancedBufferGeometry.setAttribute('position', gltfBufferGeometry.getAttribute('position'), 3);
         instancedBufferGeometry.setAttribute('normal', gltfBufferGeometry.getAttribute('normal'), 3);
         instancedBufferGeometry.setAttribute('uv', gltfBufferGeometry.getAttribute('uv'), 2);
-        instancedBufferGeometry.setAttribute('offset', new THREE.InstancedBufferAttribute( new Float32Array( offsets ), 3 ));
-        instancedBufferGeometry.setAttribute( 'color', new THREE.InstancedBufferAttribute( new Float32Array( colors ), 4 ) );
+        instancedBufferGeometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute( new Float32Array( offsets ), 3 ));
+        instancedBufferGeometry.setAttribute( 'color', new THREE.InstancedBufferAttribute( new Float32Array( colors ), 3 ) );
 
-        const instanceMaterial = new THREE.RawShaderMaterial( {
+        const instancedBufferGeometryTransparent = new THREE.InstancedBufferGeometry();
+        instancedBufferGeometryTransparent.index = gltfBufferGeometryTransparent.index;
+        instancedBufferGeometryTransparent.instanceCount = instancesTransparent;
+        instancedBufferGeometryTransparent.maxInstancedCount = instancesTransparent;
+        instancedBufferGeometryTransparent.setAttribute('position', gltfBufferGeometryTransparent.getAttribute('position'), 3);
+        instancedBufferGeometryTransparent.setAttribute('normal', gltfBufferGeometryTransparent.getAttribute('normal'), 3);
+        instancedBufferGeometryTransparent.setAttribute('uv', gltfBufferGeometryTransparent.getAttribute('uv'), 2);
+        instancedBufferGeometryTransparent.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute( new Float32Array( offsetsTransparent ), 3 ));
+        instancedBufferGeometry.setAttribute( 'instanceOpacity', new THREE.InstancedBufferAttribute( new Float32Array( opacities ), 1 ) );
 
-            vertexShader: vertexShader(),
-            fragmentShader: fragmentShader(),
-            side: THREE.DoubleSide,
-            transparent: true,
-            depthWrite: false
 
-        } );
+        const instanceMaterial = instanceStandardMaterial();
+        instanceMaterial.vertexColors = true;
+        instanceMaterial.transparent = false;
+        instanceMaterial.depthTest = true;
+        instanceMaterial.depthWrite = true;
+
+        const instanceMaterialTransparent = instanceStandardMaterial();
+        instanceMaterialTransparent.vertexColors = true;
+        instanceMaterialTransparent.transparent = true;
+        instanceMaterialTransparent.depthTest = true;
+        instanceMaterialTransparent.depthWrite = false;
+        instanceMaterialTransparent.opacity = 0.1;
+
 
         const instanceMesh = gltfMesh;
         instanceMesh.geometry = instancedBufferGeometry;
         instanceMesh.material = instanceMaterial;
+        instanceMesh.castShadow = true;
+        instanceMesh.receiveShadow = true;
+        instanceMesh.customDistanceMaterial = instanceCustomDistanceMaterial();
+        instanceMesh.customDepthMaterial = instanceCustomDepthMaterial();
         instanceMesh.frustumCulled = false;
+
+        const instanceMeshTransparent = gltfMeshTransparent;
+        instanceMeshTransparent.geometry = instancedBufferGeometryTransparent;
+        instanceMeshTransparent.material = instanceMaterialTransparent;
+        instanceMeshTransparent.castShadow = false;
+        instanceMeshTransparent.receiveShadow = false;
+        instanceMeshTransparent.customDistanceMaterial = instanceCustomDistanceMaterial();
+        instanceMeshTransparent.customDepthMaterial = instanceCustomDepthMaterial();
+        instanceMeshTransparent.frustumCulled = false;
         
-        scene.add( instanceMesh);
+        scene.add(instanceMesh, instanceMeshTransparent);
     }
 
 
